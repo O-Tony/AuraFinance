@@ -10,6 +10,7 @@ let appState = {
   currency: '$',
   theme: 'dark',
   cashBalance: 0.00,
+  cashLog: [],
   recurringExpenses: []
 };
 
@@ -47,6 +48,7 @@ function loadState() {
   const savedCurrency = localStorage.getItem('aura_currency');
   const savedTheme = localStorage.getItem('aura_theme');
   const savedCash = localStorage.getItem('aura_cash_balance');
+  const savedCashLog = localStorage.getItem('aura_cash_log');
   const savedRecurring = localStorage.getItem('aura_recurring');
 
   if (savedExpenses) {
@@ -60,6 +62,7 @@ function loadState() {
   if (savedCurrency) appState.currency = savedCurrency;
   if (savedTheme) appState.theme = savedTheme;
   if (savedCash !== null) appState.cashBalance = parseFloat(savedCash);
+  if (savedCashLog) appState.cashLog = JSON.parse(savedCashLog);
   if (savedRecurring) appState.recurringExpenses = JSON.parse(savedRecurring);
 
   const today = new Date();
@@ -84,6 +87,82 @@ function saveCashBalance() {
   localStorage.setItem('aura_cash_balance', appState.cashBalance.toString());
 }
 
+function saveCashLog() {
+  localStorage.setItem('aura_cash_log', JSON.stringify(appState.cashLog));
+}
+
+function addCashLogEntry(type, amount, note) {
+  // type: 'add' | 'payment' | 'reduce' | 'expense'
+  const entry = {
+    id: Date.now().toString(),
+    type,
+    amount,
+    note: note || '',
+    date: new Date().toISOString(),
+    balanceAfter: appState.cashBalance
+  };
+  appState.cashLog.unshift(entry); // newest first
+  saveCashLog();
+}
+
+function renderCashAuditLog() {
+  const container = document.getElementById('cash-audit-log');
+  if (!container) return;
+
+  if (appState.cashLog.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 24px 0;">
+        <i data-lucide="file-text"></i>
+        <p>No cash movements logged yet. Add cash or log a payment to get started.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  const typeConfig = {
+    add:     { icon: 'plus-circle',      label: 'Cash Added',       color: 'text-emerald', sign: '+' },
+    payment: { icon: 'arrow-down-circle', label: 'Payment Received', color: 'text-emerald', sign: '+' },
+    reduce:  { icon: 'minus-circle',      label: 'Cash Removed',     color: 'text-rose',    sign: '-' },
+    expense: { icon: 'shopping-bag',      label: 'Expense Deducted', color: 'text-rose',    sign: '-' }
+  };
+
+  container.innerHTML = appState.cashLog.map(entry => {
+    const cfg = typeConfig[entry.type] || typeConfig.expense;
+    const dateObj = new Date(entry.date);
+    const dateLabel = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeLabel = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="cash-log-item">
+        <div class="trans-left">
+          <div class="cash-log-icon ${cfg.color}">
+            <i data-lucide="${cfg.icon}"></i>
+          </div>
+          <div class="trans-meta">
+            <span class="trans-desc">${cfg.label}${entry.note ? ' — ' + escapeHTML(entry.note) : ''}</span>
+            <span class="trans-date">${dateLabel} at ${timeLabel} &bull; Balance after: ${formatCurrency(entry.balanceAfter)}</span>
+          </div>
+        </div>
+        <div class="trans-right">
+          <span class="trans-amount ${cfg.color}">${cfg.sign}${formatCurrency(entry.amount)}</span>
+          <button class="icon-btn delete-row-btn" onclick="deleteCashLogEntry('${entry.id}')" title="Remove entry">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  lucide.createIcons();
+}
+
+window.deleteCashLogEntry = function(id) {
+  if (confirm('Remove this cash log entry? Note: this does not adjust your current balance.')) {
+    appState.cashLog = appState.cashLog.filter(e => e.id !== id);
+    saveCashLog();
+    renderCashAuditLog();
+  }
+};
+
 function saveRecurring() {
   localStorage.setItem('aura_recurring', JSON.stringify(appState.recurringExpenses));
 }
@@ -95,22 +174,29 @@ function saveRecurring() {
 function updateCashBalanceDisplay() {
   const el = document.getElementById('kpi-cash-balance');
   const statusEl = document.getElementById('kpi-cash-status');
-  if (!el) return;
-  el.textContent = formatCurrency(appState.cashBalance);
+  const auditEl = document.getElementById('cash-audit-balance');
+
+  const formatted = formatCurrency(appState.cashBalance);
+  if (el) el.textContent = formatted;
+  if (auditEl) auditEl.textContent = formatted;
+
   if (appState.cashBalance < 0) {
-    el.className = 'metric-value text-rose';
+    if (el) el.className = 'metric-value text-rose';
+    if (auditEl) auditEl.className = 'metric-value text-rose';
     if (statusEl) statusEl.textContent = 'Balance overdrawn';
   } else if (appState.cashBalance === 0) {
-    el.className = 'metric-value text-muted';
+    if (el) el.className = 'metric-value text-muted';
+    if (auditEl) auditEl.className = 'metric-value text-muted';
     if (statusEl) statusEl.textContent = 'No cash on hand';
   } else {
-    el.className = 'metric-value text-emerald';
+    if (el) el.className = 'metric-value text-emerald';
+    if (auditEl) auditEl.className = 'metric-value text-emerald';
     if (statusEl) statusEl.textContent = 'Available cash';
   }
 }
 
 function openCashModal(mode) {
-  // mode: 'add' = top up, 'pay' = cash payment (increases balance as income)
+  // mode: 'add' = top up, 'payment' = cash received, 'reduce' = manual reduction
   const modal = document.getElementById('cash-modal');
   const title = document.getElementById('cash-modal-title');
   const label = document.getElementById('cash-amount-label');
@@ -120,11 +206,15 @@ function openCashModal(mode) {
   if (mode === 'add') {
     title.textContent = 'Add Cash';
     label.textContent = 'Amount to Add';
-    hint.textContent = 'Enter the amount of cash you are adding to your wallet (e.g. ATM withdrawal, received payment).';
-  } else {
+    hint.textContent = 'Enter the amount of cash you are adding to your wallet (e.g. ATM withdrawal).';
+  } else if (mode === 'payment') {
     title.textContent = 'Log Cash Payment Received';
     label.textContent = 'Payment Amount';
     hint.textContent = 'Enter a cash payment you received. This will increase your cash balance.';
+  } else if (mode === 'reduce') {
+    title.textContent = 'Reduce Cash Balance';
+    label.textContent = 'Amount to Remove';
+    hint.textContent = 'Manually reduce your cash balance (e.g. cash lost, given away, or correcting a mistake).';
   }
 
   modeInput.value = mode;
@@ -140,7 +230,7 @@ function closeCashModal() {
 function handleCashFormSubmit(e) {
   e.preventDefault();
   const amount = parseFloat(document.getElementById('cash-amount-input').value);
-  const note = document.getElementById('cash-note-input').value.trim() || 'Cash top-up';
+  const note = document.getElementById('cash-note-input').value.trim();
   const mode = document.getElementById('cash-modal-mode').value;
 
   if (isNaN(amount) || amount <= 0) {
@@ -148,14 +238,21 @@ function handleCashFormSubmit(e) {
     return;
   }
 
-  // Both 'add' and 'pay' increase the cash balance
-  appState.cashBalance += amount;
+  if (mode === 'reduce') {
+    appState.cashBalance -= amount;
+  } else {
+    // 'add' and 'payment' both increase balance
+    appState.cashBalance += amount;
+  }
+
   saveCashBalance();
+  addCashLogEntry(mode, amount, note || (mode === 'add' ? 'Cash top-up' : mode === 'payment' ? 'Payment received' : 'Manual reduction'));
   updateCashBalanceDisplay();
+  renderCashAuditLog();
   closeCashModal();
 
-  const verb = mode === 'add' ? 'Added' : 'Logged payment of';
-  speechController.speak(`${verb} ${formatCurrency(amount)} to your cash balance.`);
+  const verbMap = { add: 'Added', payment: 'Logged payment of', reduce: 'Removed' };
+  speechController.speak(`${verbMap[mode] || 'Updated'} ${formatCurrency(amount)} ${mode === 'reduce' ? 'from' : 'to'} your cash balance.`);
 }
 
 /* ==========================================================================
@@ -748,7 +845,9 @@ async function processUserCommand(command) {
     // Deduct from cash balance
     appState.cashBalance -= result.amount;
     saveCashBalance();
+    addCashLogEntry('expense', result.amount, result.description);
     updateCashBalanceDisplay();
+    renderCashAuditLog();
 
     // Auto-switch targeted month to the newly logged item's month
     appState.targetMonth = result.date.substring(0, 7);
@@ -894,7 +993,9 @@ function handleExpenseFormSubmit(e) {
     // Deduct from cash balance
     appState.cashBalance -= amount;
     saveCashBalance();
+    addCashLogEntry('expense', amount, description);
     updateCashBalanceDisplay();
+    renderCashAuditLog();
     appState.targetMonth = date.substring(0, 7);
   }
 
@@ -966,6 +1067,10 @@ function handleNavigation(tabId) {
     titleEl.textContent = "Recurring Expenses";
     subEl.textContent = "Manage monthly auto-posted subscriptions and bills.";
     renderRecurringList();
+  } else if (tabId === 'cash') {
+    titleEl.textContent = "Cash Audit Log";
+    subEl.textContent = "Full history of cash movements, payments, and adjustments.";
+    renderCashAuditLog();
   }
 }
 
@@ -1157,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Switch to correct tab based on hash on load
   const hash = window.location.hash.substring(1);
-  if (['dashboard', 'ledger', 'assistant', 'settings', 'recurring'].includes(hash)) {
+  if (['dashboard', 'ledger', 'assistant', 'settings', 'recurring', 'cash'].includes(hash)) {
     handleNavigation(hash);
   } else {
     handleNavigation('dashboard');
@@ -1322,7 +1427,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 8. Cash Balance Controls
   document.getElementById('btn-add-cash').addEventListener('click', () => openCashModal('add'));
-  document.getElementById('btn-log-cash-payment').addEventListener('click', () => openCashModal('pay'));
+  document.getElementById('btn-log-cash-payment').addEventListener('click', () => openCashModal('payment'));
+  document.getElementById('btn-reduce-cash').addEventListener('click', () => openCashModal('reduce'));
   document.getElementById('btn-close-cash-modal').addEventListener('click', closeCashModal);
   document.getElementById('btn-cancel-cash-modal').addEventListener('click', closeCashModal);
   document.getElementById('cash-modal').addEventListener('click', (e) => {

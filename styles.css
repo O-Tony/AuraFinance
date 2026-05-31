@@ -1683,3 +1683,45 @@ body {
 .recurring-item:last-child { border-bottom: none; }
 .recurring-item:hover { background: var(--bg-card-hover); }
 
+
+/* ==========================================================================
+   Cash Audit Log Items (New)
+   ========================================================================== */
+
+.cash-log-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.15s ease;
+  gap: 12px;
+}
+
+.cash-log-item:last-child { border-bottom: none; }
+.cash-log-item:hover { background: var(--bg-card-hover); }
+
+.cash-log-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card-hover);
+  flex-shrink: 0;
+}
+
+.cash-log-icon i { width: 18px; height: 18px; }
+
+.btn-outline-rose {
+  background: var(--rose-soft);
+  border: 1px solid var(--rose);
+  color: var(--rose);
+}
+
+.btn-outline-rose:hover {
+  background: var(--rose);
+  color: #fff;
+}
+

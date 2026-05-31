@@ -51,6 +51,10 @@
           <i data-lucide="repeat"></i>
           <span>Recurring</span>
         </a>
+        <a href="#cash" class="nav-item" data-tab="cash">
+          <i data-lucide="banknote"></i>
+          <span>Cash Log</span>
+        </a>
         <a href="#settings" class="nav-item" data-tab="settings">
           <i data-lucide="settings"></i>
           <span>Settings</span>
@@ -174,7 +178,10 @@
                   <i data-lucide="plus-circle"></i> Add Cash
                 </button>
                 <button class="btn btn-sm btn-outline-teal" id="btn-log-cash-payment">
-                  <i data-lucide="arrow-down-circle"></i> Log Payment
+                  <i data-lucide="arrow-down-circle"></i> Payment In
+                </button>
+                <button class="btn btn-sm btn-outline-rose" id="btn-reduce-cash">
+                  <i data-lucide="minus-circle"></i> Reduce
                 </button>
               </div>
             </div>
@@ -449,6 +456,62 @@
                   <i data-lucide="trash-2"></i>
                   <span>Purge Ledger Data</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CASH AUDIT LOG VIEW -->
+        <section id="view-cash" class="view-pane">
+          <div class="settings-grid">
+            <!-- Quick Actions -->
+            <div class="card settings-card">
+              <div class="card-header">
+                <h3>Cash Actions</h3>
+                <p class="text-muted">Add, receive, or reduce your cash balance</p>
+              </div>
+              <div class="card-body">
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--teal-soft); border-radius: 12px; border: 1px solid var(--teal);">
+                    <div>
+                      <div style="font-weight: 700; font-size: 1rem; color: var(--teal);">Current Cash Balance</div>
+                      <div class="metric-value text-emerald" id="cash-audit-balance" style="font-size: 1.6rem; margin-top: 4px;">$0.00</div>
+                    </div>
+                    <i data-lucide="banknote" style="width: 36px; height: 36px; color: var(--teal); opacity: 0.6;"></i>
+                  </div>
+                  <button class="btn btn-outline" onclick="openCashModal('add')" style="justify-content: flex-start; gap: 10px;">
+                    <i data-lucide="plus-circle" class="text-emerald"></i>
+                    <div style="text-align: left;">
+                      <div style="font-weight: 700;">Add Cash</div>
+                      <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400;">ATM withdrawal, cash on hand</div>
+                    </div>
+                  </button>
+                  <button class="btn btn-outline" onclick="openCashModal('payment')" style="justify-content: flex-start; gap: 10px;">
+                    <i data-lucide="arrow-down-circle" class="text-blue"></i>
+                    <div style="text-align: left;">
+                      <div style="font-weight: 700;">Log Payment Received</div>
+                      <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400;">Cash from a client, friend, or employer</div>
+                    </div>
+                  </button>
+                  <button class="btn btn-outline" onclick="openCashModal('reduce')" style="justify-content: flex-start; gap: 10px;">
+                    <i data-lucide="minus-circle" class="text-rose"></i>
+                    <div style="text-align: left;">
+                      <div style="font-weight: 700;">Reduce Cash Balance</div>
+                      <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400;">Cash given away, lost, or correction</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Audit Log -->
+            <div class="card settings-card">
+              <div class="card-header">
+                <h3>Movement History</h3>
+                <p class="text-muted">Every cash in and out, most recent first</p>
+              </div>
+              <div id="cash-audit-log" style="padding: 0;">
+                <!-- JS injected -->
               </div>
             </div>
           </div>
