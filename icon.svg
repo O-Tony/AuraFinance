@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="15" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background Rounded Rect -->
+  <rect width="512" height="512" rx="110" fill="#0B0F17" />
+  <!-- Inner Glow Circle -->
+  <circle cx="256" cy="256" r="180" fill="url(#grad)" opacity="0.85" filter="url(#glow)" />
+  <!-- Sparkles Emblem -->
+  <path d="M256 120 l22 90 l90 22 l-90 22 l-22 90 l-22 -90 l-90 -22 l90 -22 Z" fill="#FFFFFF" />
+  <path d="M380 140 l10 40 l40 10 l-40 10 l-10 40 l-10 -40 l-40 -10 l40 -10 Z" fill="#FFFFFF" opacity="0.75" />
+</svg>
