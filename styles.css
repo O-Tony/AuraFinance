@@ -1620,3 +1620,66 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* ==========================================================================
+   Cash Balance & Teal Accent (New)
+   ========================================================================== */
+
+:root {
+  --teal: #14B8A6;
+  --teal-soft: rgba(20, 184, 166, 0.1);
+  --teal-glow: rgba(20, 184, 166, 0.15);
+}
+
+.text-teal { color: var(--teal) !important; }
+.bg-teal-soft { background: var(--teal-soft) !important; }
+.glow-teal { box-shadow: 0 0 0 1px var(--border-color), 0 4px 24px var(--teal-glow) !important; }
+
+.cash-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-sm i { width: 13px; height: 13px; }
+
+.btn-outline-teal {
+  background: var(--teal-soft);
+  border: 1px solid var(--teal);
+  color: var(--teal);
+}
+
+.btn-outline-teal:hover {
+  background: var(--teal);
+  color: #fff;
+}
+
+/* ==========================================================================
+   Recurring Expense List Items (New)
+   ========================================================================== */
+
+.recurring-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.15s ease;
+  gap: 12px;
+}
+
+.recurring-item:last-child { border-bottom: none; }
+.recurring-item:hover { background: var(--bg-card-hover); }
+

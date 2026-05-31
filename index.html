@@ -47,6 +47,10 @@
           <span>AI Assistant</span>
           <span class="badge pulse">Live</span>
         </a>
+        <a href="#recurring" class="nav-item" data-tab="recurring">
+          <i data-lucide="repeat"></i>
+          <span>Recurring</span>
+        </a>
         <a href="#settings" class="nav-item" data-tab="settings">
           <i data-lucide="settings"></i>
           <span>Settings</span>
@@ -153,6 +157,25 @@
               <div class="metric-value" id="kpi-daily-average">$0.00</div>
               <div class="metric-footer">
                 <span class="text-muted">Calculated over last 30 days</span>
+              </div>
+            </div>
+
+            <div class="card metric-card glow-teal">
+              <div class="metric-header">
+                <span class="metric-title">Cash Balance</span>
+                <div class="metric-icon bg-teal-soft"><i data-lucide="banknote" class="text-teal"></i></div>
+              </div>
+              <div class="metric-value text-emerald" id="kpi-cash-balance">$0.00</div>
+              <div class="metric-footer">
+                <span class="text-muted" id="kpi-cash-status">Available cash</span>
+              </div>
+              <div class="cash-action-row">
+                <button class="btn btn-sm btn-outline-teal" id="btn-add-cash">
+                  <i data-lucide="plus-circle"></i> Add Cash
+                </button>
+                <button class="btn btn-sm btn-outline-teal" id="btn-log-cash-payment">
+                  <i data-lucide="arrow-down-circle"></i> Log Payment
+                </button>
               </div>
             </div>
           </div>
@@ -430,6 +453,64 @@
             </div>
           </div>
         </section>
+
+        <!-- RECURRING EXPENSES VIEW -->
+        <section id="view-recurring" class="view-pane">
+          <div class="settings-grid">
+            <!-- Add New Recurring -->
+            <div class="card settings-card">
+              <div class="card-header">
+                <h3>Add Recurring Expense</h3>
+                <p class="text-muted">Bills and subscriptions that auto-post each month</p>
+              </div>
+              <div class="card-body">
+                <form id="recurring-form">
+                  <div class="form-group">
+                    <label for="rec-description">Description / Merchant <span class="required">*</span></label>
+                    <input type="text" id="rec-description" placeholder="e.g. Netflix, Gym Membership, Rent" required>
+                  </div>
+                  <div class="grid-2-col">
+                    <div class="form-group">
+                      <label for="rec-amount">Amount <span class="required">*</span></label>
+                      <input type="number" id="rec-amount" min="0.01" step="0.01" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="rec-day">Day of Month <span class="required">*</span></label>
+                      <input type="number" id="rec-day" min="1" max="31" placeholder="e.g. 1, 15, 28" required>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="rec-category">Category <span class="required">*</span></label>
+                    <select id="rec-category" class="form-select" required>
+                      <option value="Food">Food & Dining</option>
+                      <option value="Groceries">Groceries</option>
+                      <option value="Entertainment" selected>Entertainment & Subscriptions</option>
+                      <option value="Transport">Transport & Travel</option>
+                      <option value="Utilities">Utilities & Bills</option>
+                      <option value="Shopping">Shopping & Apparel</option>
+                      <option value="Health">Health & Fitness</option>
+                      <option value="Other">Other Expenses</option>
+                    </select>
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+                    <i data-lucide="plus"></i> Add Recurring Expense
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Recurring List -->
+            <div class="card settings-card">
+              <div class="card-header">
+                <h3>Active Recurring Expenses</h3>
+                <p class="text-muted">These are auto-posted at the start of each month</p>
+              </div>
+              <div class="card-body" id="recurring-list" style="padding: 0;">
+                <!-- JS injected -->
+              </div>
+            </div>
+          </div>
+        </section>
         
       </div>
     </main>
@@ -439,6 +520,35 @@
       <i data-lucide="mic"></i>
       <div class="fab-pulse"></div>
     </button>
+
+    <!-- Cash Balance Modal -->
+    <div class="modal-overlay" id="cash-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="cash-modal-title">Add Cash</h3>
+          <button class="close-btn" id="btn-close-cash-modal"><i data-lucide="x"></i></button>
+        </div>
+        <form id="cash-form">
+          <input type="hidden" id="cash-modal-mode" value="add">
+          <div class="form-group">
+            <label for="cash-amount-input" id="cash-amount-label">Amount to Add <span class="required">*</span></label>
+            <div class="input-with-addon">
+              <span class="addon">$</span>
+              <input type="number" id="cash-amount-input" min="0.01" step="0.01" placeholder="0.00" required>
+            </div>
+            <span class="help-text" id="cash-modal-hint">Enter the amount of cash you are adding to your wallet.</span>
+          </div>
+          <div class="form-group">
+            <label for="cash-note-input">Note (optional)</label>
+            <input type="text" id="cash-note-input" placeholder="e.g. ATM withdrawal, pay from client">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" id="btn-cancel-cash-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Confirm</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- Transaction Form Modal -->
     <div class="modal-overlay" id="expense-modal">

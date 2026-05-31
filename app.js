@@ -8,7 +8,9 @@ let appState = {
   expenses: [],
   budget: 1000.00,
   currency: '$',
-  theme: 'dark'
+  theme: 'dark',
+  cashBalance: 0.00,
+  recurringExpenses: []
 };
 
 // Available Category Icons map for list rendering
@@ -44,11 +46,12 @@ function loadState() {
   const savedBudget = localStorage.getItem('aura_budget');
   const savedCurrency = localStorage.getItem('aura_currency');
   const savedTheme = localStorage.getItem('aura_theme');
+  const savedCash = localStorage.getItem('aura_cash_balance');
+  const savedRecurring = localStorage.getItem('aura_recurring');
 
   if (savedExpenses) {
     appState.expenses = JSON.parse(savedExpenses);
   } else {
-    // Fresh launch: Seed dummy items so the user has an instant dashboard experience
     appState.expenses = [...DUMMY_DATA];
     saveExpenses();
   }
@@ -56,14 +59,16 @@ function loadState() {
   if (savedBudget) appState.budget = parseFloat(savedBudget);
   if (savedCurrency) appState.currency = savedCurrency;
   if (savedTheme) appState.theme = savedTheme;
+  if (savedCash !== null) appState.cashBalance = parseFloat(savedCash);
+  if (savedRecurring) appState.recurringExpenses = JSON.parse(savedRecurring);
 
-  // Initialize targeted month to current local month (YYYY-MM)
   const today = new Date();
   appState.targetMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  // Apply visual theme tokens
   document.documentElement.setAttribute('data-theme', appState.theme);
   chartController.setCurrencySymbol(appState.currency);
+
+  autoPostRecurringExpenses();
 }
 
 function saveExpenses() {
@@ -73,6 +78,227 @@ function saveExpenses() {
 function saveSettings() {
   localStorage.setItem('aura_budget', appState.budget.toString());
   localStorage.setItem('aura_currency', appState.currency);
+}
+
+function saveCashBalance() {
+  localStorage.setItem('aura_cash_balance', appState.cashBalance.toString());
+}
+
+function saveRecurring() {
+  localStorage.setItem('aura_recurring', JSON.stringify(appState.recurringExpenses));
+}
+
+/* ==========================================================================
+   Cash Balance Management
+   ========================================================================== */
+
+function updateCashBalanceDisplay() {
+  const el = document.getElementById('kpi-cash-balance');
+  const statusEl = document.getElementById('kpi-cash-status');
+  if (!el) return;
+  el.textContent = formatCurrency(appState.cashBalance);
+  if (appState.cashBalance < 0) {
+    el.className = 'metric-value text-rose';
+    if (statusEl) statusEl.textContent = 'Balance overdrawn';
+  } else if (appState.cashBalance === 0) {
+    el.className = 'metric-value text-muted';
+    if (statusEl) statusEl.textContent = 'No cash on hand';
+  } else {
+    el.className = 'metric-value text-emerald';
+    if (statusEl) statusEl.textContent = 'Available cash';
+  }
+}
+
+function openCashModal(mode) {
+  // mode: 'add' = top up, 'pay' = cash payment (increases balance as income)
+  const modal = document.getElementById('cash-modal');
+  const title = document.getElementById('cash-modal-title');
+  const label = document.getElementById('cash-amount-label');
+  const hint = document.getElementById('cash-modal-hint');
+  const modeInput = document.getElementById('cash-modal-mode');
+
+  if (mode === 'add') {
+    title.textContent = 'Add Cash';
+    label.textContent = 'Amount to Add';
+    hint.textContent = 'Enter the amount of cash you are adding to your wallet (e.g. ATM withdrawal, received payment).';
+  } else {
+    title.textContent = 'Log Cash Payment Received';
+    label.textContent = 'Payment Amount';
+    hint.textContent = 'Enter a cash payment you received. This will increase your cash balance.';
+  }
+
+  modeInput.value = mode;
+  document.getElementById('cash-amount-input').value = '';
+  document.getElementById('cash-note-input').value = '';
+  modal.classList.add('active');
+}
+
+function closeCashModal() {
+  document.getElementById('cash-modal').classList.remove('active');
+}
+
+function handleCashFormSubmit(e) {
+  e.preventDefault();
+  const amount = parseFloat(document.getElementById('cash-amount-input').value);
+  const note = document.getElementById('cash-note-input').value.trim() || 'Cash top-up';
+  const mode = document.getElementById('cash-modal-mode').value;
+
+  if (isNaN(amount) || amount <= 0) {
+    alert('Please enter a valid positive amount.');
+    return;
+  }
+
+  // Both 'add' and 'pay' increase the cash balance
+  appState.cashBalance += amount;
+  saveCashBalance();
+  updateCashBalanceDisplay();
+  closeCashModal();
+
+  const verb = mode === 'add' ? 'Added' : 'Logged payment of';
+  speechController.speak(`${verb} ${formatCurrency(amount)} to your cash balance.`);
+}
+
+/* ==========================================================================
+   Recurring Expenses
+   ========================================================================== */
+
+/**
+ * Auto-post recurring expenses for the current month if not yet posted
+ */
+function autoPostRecurringExpenses() {
+  const today = new Date();
+  const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  let posted = 0;
+  appState.recurringExpenses.forEach(rec => {
+    if (!rec.active) return;
+
+    // Build the date this recurring item should fire this month
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const day = Math.min(rec.dayOfMonth, daysInMonth);
+    const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
+
+    // Check if already posted this month
+    const alreadyPosted = appState.expenses.some(
+      e => e.recurringId === rec.id && e.date.startsWith(currentMonth)
+    );
+
+    if (!alreadyPosted) {
+      const newRecord = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2),
+        description: rec.description,
+        amount: rec.amount,
+        category: rec.category,
+        date: dateStr,
+        recurringId: rec.id,
+        isRecurring: true
+      };
+      appState.expenses.push(newRecord);
+      posted++;
+    }
+  });
+
+  if (posted > 0) {
+    saveExpenses();
+  }
+}
+
+function renderRecurringList() {
+  const container = document.getElementById('recurring-list');
+  if (!container) return;
+
+  if (appState.recurringExpenses.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 24px 0;">
+        <i data-lucide="repeat"></i>
+        <p>No recurring expenses set up yet. Add one below.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = appState.recurringExpenses.map(rec => {
+    const icon = CATEGORY_ICONS[rec.category] || 'help-circle';
+    const statusClass = rec.active ? 'text-emerald' : 'text-muted';
+    const statusLabel = rec.active ? 'Active' : 'Paused';
+    return `
+      <div class="recurring-item" id="rec-row-${rec.id}">
+        <div class="trans-left">
+          <div class="category-icon-wrapper category-${rec.category}">
+            <i data-lucide="${icon}"></i>
+          </div>
+          <div class="trans-meta">
+            <span class="trans-desc">${escapeHTML(rec.description)}</span>
+            <span class="trans-date">Every month on day ${rec.dayOfMonth} &bull; ${rec.category}</span>
+          </div>
+        </div>
+        <div class="trans-right" style="gap: 10px;">
+          <span class="trans-amount text-rose">-${formatCurrency(rec.amount)}</span>
+          <span class="trans-badge ${statusClass}">${statusLabel}</span>
+          <button class="icon-btn" onclick="toggleRecurring('${rec.id}')" title="Toggle active">
+            <i data-lucide="${rec.active ? 'pause-circle' : 'play-circle'}"></i>
+          </button>
+          <button class="icon-btn delete-row-btn" onclick="deleteRecurring('${rec.id}')" title="Remove">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  lucide.createIcons();
+}
+
+window.toggleRecurring = function(id) {
+  const idx = appState.recurringExpenses.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    appState.recurringExpenses[idx].active = !appState.recurringExpenses[idx].active;
+    saveRecurring();
+    renderRecurringList();
+  }
+};
+
+window.deleteRecurring = function(id) {
+  if (confirm('Remove this recurring expense? Future months will not be auto-posted.')) {
+    appState.recurringExpenses = appState.recurringExpenses.filter(r => r.id !== id);
+    saveRecurring();
+    renderRecurringList();
+  }
+};
+
+function handleRecurringFormSubmit(e) {
+  e.preventDefault();
+  const description = document.getElementById('rec-description').value.trim();
+  const amount = parseFloat(document.getElementById('rec-amount').value);
+  const category = document.getElementById('rec-category').value;
+  const dayOfMonth = parseInt(document.getElementById('rec-day').value);
+
+  if (!description || isNaN(amount) || amount <= 0 || isNaN(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+    alert('Please fill in all fields correctly. Day must be between 1 and 31.');
+    return;
+  }
+
+  const newRec = {
+    id: Date.now().toString(),
+    description,
+    amount,
+    category,
+    dayOfMonth,
+    active: true
+  };
+
+  appState.recurringExpenses.push(newRec);
+  saveRecurring();
+
+  // Immediately post for current month if not yet posted
+  autoPostRecurringExpenses();
+  saveExpenses();
+  updateDashboardMetrics();
+  renderLedgerTable();
+  renderRecurringList();
+
+  // Reset form
+  document.getElementById('recurring-form').reset();
 }
 
 /* ==========================================================================
@@ -182,6 +408,9 @@ function updateDashboardMetrics() {
   // Re-build Recent List & Insights
   buildRecentList(targetExpenses);
   buildSmartInsights(targetExpenses, totalSpent, spentPercentage);
+
+  // Update cash balance display
+  updateCashBalanceDisplay();
 }
 
 function buildRecentList(targetExpenses) {
@@ -516,6 +745,11 @@ async function processUserCommand(command) {
     appState.expenses.push(newRecord);
     saveExpenses();
     
+    // Deduct from cash balance
+    appState.cashBalance -= result.amount;
+    saveCashBalance();
+    updateCashBalanceDisplay();
+
     // Auto-switch targeted month to the newly logged item's month
     appState.targetMonth = result.date.substring(0, 7);
     
@@ -639,7 +873,12 @@ function handleExpenseFormSubmit(e) {
     // Edit existing
     const idx = appState.expenses.findIndex(e => e.id === id);
     if (idx !== -1) {
+      const oldAmount = parseFloat(appState.expenses[idx].amount) || 0;
       appState.expenses[idx] = { id, description, amount, category, date };
+      // Adjust cash balance by the difference
+      appState.cashBalance += oldAmount - amount;
+      saveCashBalance();
+      updateCashBalanceDisplay();
       appState.targetMonth = date.substring(0, 7);
     }
   } else {
@@ -652,6 +891,10 @@ function handleExpenseFormSubmit(e) {
       date
     };
     appState.expenses.push(newRecord);
+    // Deduct from cash balance
+    appState.cashBalance -= amount;
+    saveCashBalance();
+    updateCashBalanceDisplay();
     appState.targetMonth = date.substring(0, 7);
   }
 
@@ -663,6 +906,12 @@ function handleExpenseFormSubmit(e) {
 
 window.deleteExpenseRecord = function(id) {
   if (confirm("Are you sure you want to remove this transaction record?")) {
+    const record = appState.expenses.find(e => e.id === id);
+    if (record) {
+      appState.cashBalance += parseFloat(record.amount) || 0;
+      saveCashBalance();
+      updateCashBalanceDisplay();
+    }
     appState.expenses = appState.expenses.filter(e => e.id !== id);
     saveExpenses();
     updateDashboardMetrics();
@@ -713,6 +962,10 @@ function handleNavigation(tabId) {
     titleEl.textContent = "Settings Dashboard";
     subEl.textContent = "Manage API interfaces, backup ledgers, and configurations.";
     loadSettingsInputs();
+  } else if (tabId === 'recurring') {
+    titleEl.textContent = "Recurring Expenses";
+    subEl.textContent = "Manage monthly auto-posted subscriptions and bills.";
+    renderRecurringList();
   }
 }
 
@@ -904,7 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Switch to correct tab based on hash on load
   const hash = window.location.hash.substring(1);
-  if (['dashboard', 'ledger', 'assistant', 'settings'].includes(hash)) {
+  if (['dashboard', 'ledger', 'assistant', 'settings', 'recurring'].includes(hash)) {
     handleNavigation(hash);
   } else {
     handleNavigation('dashboard');
@@ -1066,4 +1319,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load Lucide Icons initial pass
   lucide.createIcons();
+
+  // 8. Cash Balance Controls
+  document.getElementById('btn-add-cash').addEventListener('click', () => openCashModal('add'));
+  document.getElementById('btn-log-cash-payment').addEventListener('click', () => openCashModal('pay'));
+  document.getElementById('btn-close-cash-modal').addEventListener('click', closeCashModal);
+  document.getElementById('btn-cancel-cash-modal').addEventListener('click', closeCashModal);
+  document.getElementById('cash-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'cash-modal') closeCashModal();
+  });
+  document.getElementById('cash-form').addEventListener('submit', handleCashFormSubmit);
+
+  // 9. Recurring Expense Form
+  document.getElementById('recurring-form').addEventListener('submit', handleRecurringFormSubmit);
+
+  updateCashBalanceDisplay();
 });
